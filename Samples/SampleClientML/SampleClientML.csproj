@@ -13,7 +13,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>SampleClientML</RootNamespace>
     <AssemblyName>SampleClientML</AssemblyName>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <IsWebBootstrapper>false</IsWebBootstrapper>
     <TargetFrameworkProfile />
@@ -64,6 +64,7 @@
     <Prefer32Bit>true</Prefer32Bit>
     <GenerateSerializationAssemblies>Off</GenerateSerializationAssemblies>
     <UseVSHostingProcess>false</UseVSHostingProcess>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
     <OutputPath>..\bin\x86\</OutputPath>
@@ -91,6 +92,13 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Mavlink.cs" />
+    <Compile Include="MavlinkCRC.cs" />
+    <Compile Include="MAVLinkMessage.cs" />
+    <Compile Include="MAVLinkParam.cs" />
+    <Compile Include="MAVLinkParamList.cs" />
+    <Compile Include="MavlinkParse.cs" />
+    <Compile Include="MavlinkUtil.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SampleClientML.cs" />
   </ItemGroup>
@@ -113,6 +121,9 @@
       <ProductName>.NET Framework 3.5 SP1</ProductName>
       <Install>false</Install>
     </BootstrapperPackage>
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadata Include="Service References\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

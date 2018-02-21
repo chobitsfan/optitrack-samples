@@ -17,6 +17,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Net;
+using System.Net.Sockets;
 
 using NatNetML;
 
@@ -67,6 +69,13 @@ namespace SampleClientML
         /*  boolean value for detecting change in asset */
         private static bool mAssetChanged = false;
 
+        private static MAVLink.MavlinkParse mavlinkParse = new MAVLink.MavlinkParse();
+        private static Socket mavSock = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        private static IPEndPoint mavEp = new IPEndPoint(IPAddress.Loopback, 14550);
+        private static float lastPosX = 0;
+        private static float lastPosY = 0;
+        private static float lastPosZ = 0;
+        private static DateTime lastTime = DateTime.MaxValue;
 
         static void Main()
         {
@@ -123,6 +132,8 @@ namespace SampleClientML
             /*  [NatNet] Disabling data handling function   */
             mNatNet.OnFrameReady -= fetchFrameData;
 
+            mavSock.Close();
+
             /*  Clearing Saved Descriptions */
             mRigidBodies.Clear();
             mSkeletons.Clear();
@@ -162,7 +173,7 @@ namespace SampleClientML
 
             /*  Processing and ouputting frame data every 200th frame.
                 This conditional statement is included in order to simplify the program output */
-            if(data.iFrame % 200 == 0)
+            if(data.iFrame % 10 == 0)
             {
                 if (data.bRecording == false)
                     Console.WriteLine("Frame #{0} Received:", data.iFrame);
@@ -191,6 +202,44 @@ namespace SampleClientML
                         {
                             Console.WriteLine("\tRigidBody ({0}):", rb.Name);
                             Console.WriteLine("\t\tpos ({0:N3}, {1:N3}, {2:N3})", rbData.x, rbData.y, rbData.z);
+
+                            int epoch = 86400 * (10 * 365 + (1980 - 1969) / 4 + 1 + 6 - 2) - (18000 / 1000);
+                            DateTime cur = DateTime.UtcNow;
+                            TimeSpan ts = cur - new DateTime(1970, 1, 1);
+                            int epoch_sec = (int)ts.TotalSeconds - epoch;
+
+                            MAVLink.mavlink_gps_input_t gps_input = new MAVLink.mavlink_gps_input_t();
+                            gps_input.ignore_flags = 0x85;
+                            gps_input.fix_type = 3;
+                            gps_input.gps_id = 0;
+                            gps_input.hdop = 0.01f;
+                            gps_input.speed_accuracy = 0.01f;
+                            gps_input.horiz_accuracy = 0.01f;
+                            gps_input.satellites_visible = 20;
+                            gps_input.time_week = (ushort)(epoch_sec / 604800);
+                            gps_input.time_week_ms = (uint)((epoch_sec % 604800) * 1000 + ts.Milliseconds);
+                            gps_input.lat = (int)(180.0 / (Math.PI * 6371008.8) * rbData.z * 10000000) + 247734810;
+                            gps_input.lon = 1210456978 - (int)(180.0 / (Math.PI * 6371008.8) * rbData.x * 10000000);
+                            if (lastTime == DateTime.MaxValue)
+                            {
+                                gps_input.vn = 0;
+                                gps_input.ve = 0;
+                                gps_input.vd = 0;
+                            }
+                            else
+                            {
+                                TimeSpan vts = cur - lastTime;
+                                gps_input.vn = (rbData.z - lastPosZ) / vts.Milliseconds * 1000.0f;
+                                gps_input.ve = (rbData.x - lastPosX) / vts.Milliseconds * -1000.0f;
+                                gps_input.vd = (rbData.y - lastPosY) / vts.Milliseconds * -1000.0f;
+                                lastTime = cur;
+                            }
+                            lastPosX = rbData.x;
+                            lastPosY = rbData.y;
+                            lastPosZ = rbData.z;
+                            //Console.WriteLine("lat/lon:" + gps_input.lat + "," + gps_input.lon);
+                            byte[] pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.GPS_INPUT, gps_input);
+                            mavSock.SendTo(pkt, mavEp);
 
                             // Rigid Body Euler Orientation
                             float[] quat = new float[4] { rbData.qx, rbData.qy, rbData.qz, rbData.qw };
