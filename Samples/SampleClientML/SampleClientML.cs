@@ -71,7 +71,7 @@ namespace SampleClientML
 
         private static MAVLink.MavlinkParse mavlinkParse = new MAVLink.MavlinkParse();
         private static Socket mavSock = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-        private static IPEndPoint mavEp = new IPEndPoint(IPAddress.Loopback, 14550);
+        private static IPEndPoint mavEp = new IPEndPoint(IPAddress.Parse("192.168.42.1"), 14551);
         private static float lastPosX = 0;
         private static float lastPosY = 0;
         private static float lastPosZ = 0;
@@ -209,22 +209,25 @@ namespace SampleClientML
                             int epoch_sec = (int)ts.TotalSeconds - epoch;
 
                             MAVLink.mavlink_gps_input_t gps_input = new MAVLink.mavlink_gps_input_t();
-                            gps_input.ignore_flags = 0x85;
+                            gps_input.ignore_flags = (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_ALT |
+                                (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_VDOP | 
+                                (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_VERTICAL_ACCURACY;
                             gps_input.fix_type = 3;
                             gps_input.gps_id = 0;
-                            gps_input.hdop = 0.01f;
-                            gps_input.speed_accuracy = 0.01f;
-                            gps_input.horiz_accuracy = 0.01f;
+                            gps_input.hdop = 0.1f;
+                            gps_input.speed_accuracy = 0.1f;
+                            gps_input.horiz_accuracy = 0.1f;
                             gps_input.satellites_visible = 20;
                             gps_input.time_week = (ushort)(epoch_sec / 604800);
                             gps_input.time_week_ms = (uint)((epoch_sec % 604800) * 1000 + ts.Milliseconds);
-                            gps_input.lat = (int)(180.0 / (Math.PI * 6371008.8) * rbData.z * 10000000) + 247734810;
-                            gps_input.lon = 1210456978 - (int)(180.0 / (Math.PI * 6371008.8) * rbData.x * 10000000);
+                            gps_input.lat = (int)(((180.0 / (Math.PI * 6371008.8) * rbData.z) + 24.773481)*10000000);
+                            gps_input.lon = (int)((121.0456978 - (180.0 / (Math.PI * 6371008.8) * rbData.x))*10000000);
                             if (lastTime == DateTime.MaxValue)
                             {
                                 gps_input.vn = 0;
                                 gps_input.ve = 0;
                                 gps_input.vd = 0;
+                                lastTime = cur;
                             }
                             else
                             {
@@ -237,7 +240,6 @@ namespace SampleClientML
                             lastPosX = rbData.x;
                             lastPosY = rbData.y;
                             lastPosZ = rbData.z;
-                            //Console.WriteLine("lat/lon:" + gps_input.lat + "," + gps_input.lon);
                             byte[] pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.GPS_INPUT, gps_input);
                             mavSock.SendTo(pkt, mavEp);
 
@@ -250,7 +252,7 @@ namespace SampleClientML
                             double yrot = RadiansToDegrees(eulers[1]);
                             double zrot = RadiansToDegrees(eulers[2]);
 
-                            Console.WriteLine("\t\tori ({0:N3}, {1:N3}, {2:N3})", xrot, yrot, zrot);
+                            //Console.WriteLine("\t\tori ({0:N3}, {1:N3}, {2:N3})", xrot, yrot, zrot);
                         }
                         else
                         {
