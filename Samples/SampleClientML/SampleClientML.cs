@@ -84,16 +84,11 @@ namespace SampleClientML
         private static MAVLink.MavlinkParse mavlinkParse = new MAVLink.MavlinkParse();
         private static Socket mavSock = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         private static Dictionary<string, DroneData> drones = new Dictionary<string, DroneData>(5);
-        //private static IPEndPoint mavEp = new IPEndPoint(IPAddress.Parse("192.168.42.1"), 14551);
-        //private static float lastPosX = 0;
-        //private static float lastPosY = 0;
-        //private static float lastPosZ = 0;
-        //private static DateTime lastTime = DateTime.MaxValue;
 
         static void Main()
         {
-            drones.Add("mav1", new DroneData("192.168.8.100", 14551));
-            drones.Add("mav2", new DroneData("192.168.8.101", 14551));
+            drones.Add("mav1", new DroneData("192.168.42.1", 14551));
+            //drones.Add("mav2", new DroneData("192.168.8.101", 14551));
 
             Console.WriteLine("SampleClientML managed client application starting...\n");
             /*  [NatNet] Initialize client object and connect to the server  */
@@ -229,19 +224,23 @@ namespace SampleClientML
                                 int epoch_sec = (int)ts.TotalSeconds - epoch;
 
                                 MAVLink.mavlink_gps_input_t gps_input = new MAVLink.mavlink_gps_input_t();
-                                gps_input.ignore_flags = (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_ALT |
-                                    (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_VDOP |
-                                    (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_VERTICAL_ACCURACY;
+                                //gps_input.ignore_flags = (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_ALT |
+                                //    (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_VDOP |
+                                //    (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_VERTICAL_ACCURACY;
+                                gps_input.ignore_flags = 0;
                                 gps_input.fix_type = 3;
                                 gps_input.gps_id = 0;
                                 gps_input.hdop = 0.1f;
+                                gps_input.vdop = 0.1f;
                                 gps_input.speed_accuracy = 0.1f;
                                 gps_input.horiz_accuracy = 0.1f;
+                                gps_input.vert_accuracy = 0.1f;
                                 gps_input.satellites_visible = 20;
                                 gps_input.time_week = (ushort)(epoch_sec / 604800);
                                 gps_input.time_week_ms = (uint)((epoch_sec % 604800) * 1000 + ts.Milliseconds);
                                 gps_input.lat = (int)(((180.0 / (Math.PI * 6371008.8) * rbData.z) + 24.773481) * 10000000);
                                 gps_input.lon = (int)((121.0456978 - (180.0 / (Math.PI * 6371008.8) * rbData.x)) * 10000000);
+                                gps_input.alt = rbData.y + 125.0f;
                                 if (drone.lastTime == DateTime.MaxValue)
                                 {
                                     gps_input.vn = 0;
