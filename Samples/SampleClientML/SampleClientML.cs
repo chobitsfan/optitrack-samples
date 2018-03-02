@@ -184,12 +184,12 @@ namespace SampleClientML
 
             /*  Processing and ouputting frame data every 200th frame.
                 This conditional statement is included in order to simplify the program output */
-            if(data.iFrame % 10 == 0)
+            if(data.iFrame % 4 == 0)
             {
-                if (data.bRecording == false)
-                    Console.WriteLine("Frame #{0} Received:", data.iFrame);
-                else if (data.bRecording == true)
-                    Console.WriteLine("[Recording] Frame #{0} Received:", data.iFrame);
+                //if (data.bRecording == false)
+                //    Console.WriteLine("Frame #{0} Received:", data.iFrame);
+                //else if (data.bRecording == true)
+                //    Console.WriteLine("[Recording] Frame #{0} Received:", data.iFrame);
 
                 processFrameData(data);
             }
@@ -228,7 +228,7 @@ namespace SampleClientML
                                 //    (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_VDOP |
                                 //    (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_VERTICAL_ACCURACY;
                                 gps_input.ignore_flags = 0;
-                                gps_input.fix_type = 3;
+                                gps_input.fix_type = (byte)MAVLink.GPS_FIX_TYPE._3D_FIX;
                                 gps_input.gps_id = 0;
                                 gps_input.hdop = 0.1f;
                                 gps_input.vdop = 0.1f;
@@ -277,6 +277,15 @@ namespace SampleClientML
                         else
                         {
                             Console.WriteLine("\t{0} is not tracked in current frame", rb.Name);
+                            if (drones.ContainsKey(rb.Name))
+                            {
+                                DroneData drone = drones[rb.Name];
+                                MAVLink.mavlink_gps_input_t gps_input = new MAVLink.mavlink_gps_input_t();
+                                gps_input.gps_id = 0;
+                                gps_input.fix_type = (byte)MAVLink.GPS_FIX_TYPE.NO_FIX;
+                                byte[] pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.GPS_INPUT, gps_input);
+                                mavSock.SendTo(pkt, drone.ep);
+                            }
                         }
                     }
                 }
