@@ -55,6 +55,7 @@ namespace SampleClientML
         public float lastPosY = 0;
         public float lastPosZ = 0;
         public DateTime lastTime = DateTime.MaxValue;
+        public int lost_count = 0;
         public DroneData(string ip, int port)
         {
             ep = new IPEndPoint(IPAddress.Parse(ip), port);
@@ -87,8 +88,9 @@ namespace SampleClientML
 
         static void Main()
         {
-            drones.Add("mav1", new DroneData("192.168.42.1", 14551));
+            //drones.Add("mav1", new DroneData("192.168.42.1", 14550));
             //drones.Add("mav2", new DroneData("192.168.8.101", 14551));
+            drones.Add("mav1", new DroneData("127.0.0.1", 18000));
 
             Console.WriteLine("SampleClientML managed client application starting...\n");
             /*  [NatNet] Initialize client object and connect to the server  */
@@ -184,7 +186,7 @@ namespace SampleClientML
 
             /*  Processing and ouputting frame data every 200th frame.
                 This conditional statement is included in order to simplify the program output */
-            if(data.iFrame % 4 == 0)
+            if(data.iFrame % 24 == 0)
             {
                 //if (data.bRecording == false)
                 //    Console.WriteLine("Frame #{0} Received:", data.iFrame);
@@ -217,6 +219,7 @@ namespace SampleClientML
                             if (drones.ContainsKey(rb.Name))
                             {
                                 DroneData drone = drones[rb.Name];
+                                drone.lost_count = 0;
 
                                 int epoch = 86400 * (10 * 365 + (1980 - 1969) / 4 + 1 + 6 - 2) - (18000 / 1000);
                                 DateTime cur = DateTime.UtcNow;
@@ -280,11 +283,16 @@ namespace SampleClientML
                             if (drones.ContainsKey(rb.Name))
                             {
                                 DroneData drone = drones[rb.Name];
-                                MAVLink.mavlink_gps_input_t gps_input = new MAVLink.mavlink_gps_input_t();
-                                gps_input.gps_id = 0;
-                                gps_input.fix_type = (byte)MAVLink.GPS_FIX_TYPE.NO_FIX;
-                                byte[] pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.GPS_INPUT, gps_input);
-                                mavSock.SendTo(pkt, drone.ep);
+                                drone.lost_count++;
+                                if (drone.lost_count > 3)
+                                {
+                                    drone.lost_count = 0;
+                                    MAVLink.mavlink_gps_input_t gps_input = new MAVLink.mavlink_gps_input_t();
+                                    gps_input.gps_id = 0;
+                                    gps_input.fix_type = (byte)MAVLink.GPS_FIX_TYPE.NO_FIX;
+                                    byte[] pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.GPS_INPUT, gps_input);
+                                    mavSock.SendTo(pkt, drone.ep);
+                                }
                             }
                         }
                     }
