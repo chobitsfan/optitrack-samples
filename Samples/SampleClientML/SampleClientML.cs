@@ -91,6 +91,7 @@ namespace SampleClientML
             //drones.Add("mav1", new DroneData("192.168.42.1", 14550));
             //drones.Add("mav2", new DroneData("192.168.8.101", 14551));
             drones.Add("mav1", new DroneData("192.168.42.1", 14550));
+            drones.Add("mav2", new DroneData("192.168.42.1", 14550));
 
             Console.WriteLine("SampleClientML managed client application starting...\n");
             /*  [NatNet] Initialize client object and connect to the server  */
@@ -186,7 +187,7 @@ namespace SampleClientML
 
             /*  Processing and ouputting frame data every 200th frame.
                 This conditional statement is included in order to simplify the program output */
-            if(data.iFrame % 4 == 0)
+            if(data.iFrame % 3 == 0)
             {
                 //if (data.bRecording == false)
                 //    Console.WriteLine("Frame #{0} Received:", data.iFrame);
@@ -217,36 +218,34 @@ namespace SampleClientML
 
                         if (rbData.Tracked == true)
                         {
-                            //Console.WriteLine("\tRigidBody ({0}):", rb.Name);
-                            //Console.WriteLine("\t\tpos ({0:N3}, {1:N3}, {2:N3})", rbData.x, rbData.y, rbData.z);
+#if DEBUG_MSG
+                            Console.WriteLine("\tRigidBody ({0}):", rb.Name);
+                            Console.WriteLine("\t\tpos ({0:N3}, {1:N3}, {2:N3})", rbData.x, rbData.y, rbData.z);
 
                             // Rigid Body Euler Orientation
                             float[] quat = new float[4] { rbData.qx, rbData.qy, rbData.qz, rbData.qw };
                             float[] eulers = new float[3];
 
                             eulers = NatNetClientML.QuatToEuler(quat, NATEulerOrder.NAT_XYZr); //Converting quat orientation into XYZ Euler representation.
-                            //double xrot = RadiansToDegrees(eulers[0]);
-                            //double yrot = RadiansToDegrees(eulers[1]);
-                            //double zrot = RadiansToDegrees(eulers[2]);
-                            //Console.WriteLine("\t\tori ({0:N3}, {1:N3}, {2:N3})", xrot, yrot, zrot);
-
+                            double xrot = RadiansToDegrees(eulers[0]);
+                            double yrot = RadiansToDegrees(eulers[1]);
+                            double zrot = RadiansToDegrees(eulers[2]);
+                            Console.WriteLine("\t\tori ({0:N3}, {1:N3}, {2:N3})", xrot, yrot, zrot);
+#endif
                             if (drones.ContainsKey(rb.Name))
                             {
                                 DroneData drone = drones[rb.Name];
                                 drone.lost_count = 0;
 
-                                //int epoch = 86400 * (10 * 365 + (1980 - 1969) / 4 + 1 + 6 - 2) - (18000 / 1000);
-                                //DateTime cur = DateTime.UtcNow;
-                                //TimeSpan ts = cur - new DateTime(1970, 1, 1);
-                                //int epoch_sec = (int)ts.TotalSeconds - epoch;
                                 DateTime cur = DateTime.UtcNow;
                                 TimeSpan gps_ts = cur - gps_epoch;
-
+                                byte[] pkt;
+                                
                                 MAVLink.mavlink_gps_input_t gps_input = new MAVLink.mavlink_gps_input_t();
-                                //gps_input.ignore_flags = (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_ALT |
-                                //    (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_VDOP |
-                                //    (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_VERTICAL_ACCURACY;
-                                gps_input.ignore_flags = 0;
+                                gps_input.ignore_flags = 
+                                    (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_VEL_HORIZ |
+                                    (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_VEL_VERT;
+                                //gps_input.ignore_flags = 0;
                                 gps_input.fix_type = (byte)MAVLink.GPS_FIX_TYPE._3D_FIX;
                                 gps_input.gps_id = 0;
                                 gps_input.hdop = 0.1f;
@@ -255,14 +254,12 @@ namespace SampleClientML
                                 gps_input.horiz_accuracy = 0.1f;
                                 gps_input.vert_accuracy = 0.1f;
                                 gps_input.satellites_visible = 20;
-                                //gps_input.time_week = (ushort)(epoch_sec / 604800);
-                                // gps_input.time_week_ms = (uint)((epoch_sec % 604800) * 1000 + ts.Milliseconds);
                                 gps_input.time_week = (ushort)(gps_ts.TotalDays / 7);
                                 gps_input.time_week_ms = (uint)(gps_ts.TotalDays % 7 * 86400 * 1000 + GPS_LEAPSECONDS_MILLIS);
                                 gps_input.lat = (int)(((180.0 / (Math.PI * 6371008.8) * rbData.z) + 24.773481) * 10000000);
                                 gps_input.lon = (int)((121.0456978 - (180.0 / (Math.PI * 6371008.8) * rbData.x)) * 10000000);
                                 gps_input.alt = rbData.y + 125.0f;
-                                if (drone.lastTime == DateTime.MaxValue)
+                                /*if (drone.lastTime == DateTime.MaxValue)
                                 {
                                     gps_input.vn = 0;
                                     gps_input.ve = 0;
@@ -279,11 +276,11 @@ namespace SampleClientML
                                 }
                                 drone.lastPosX = rbData.x;
                                 drone.lastPosY = rbData.y;
-                                drone.lastPosZ = rbData.z;
-                                byte[] pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.GPS_INPUT, gps_input);
+                                drone.lastPosZ = rbData.z;*/
+                                pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.GPS_INPUT, gps_input);
                                 mavSock.SendTo(pkt, drone.ep);
 
-                                MAVLink.mavlink_vision_position_estimate_t vis_pos = new MAVLink.mavlink_vision_position_estimate_t();
+                                /*MAVLink.mavlink_vision_position_estimate_t vis_pos = new MAVLink.mavlink_vision_position_estimate_t();
                                 vis_pos.usec = (ulong)((cur - unix_epoch).TotalMilliseconds * 1000);
                                 vis_pos.x = rbData.z; //north
                                 vis_pos.y = -rbData.x; //east
@@ -291,7 +288,14 @@ namespace SampleClientML
                                 vis_pos.pitch = eulers[0];
                                 vis_pos.roll = eulers[2];
                                 vis_pos.yaw = eulers[1];
-                                pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.VISION_POSITION_ESTIMATE, vis_pos);
+                                pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.VISION_POSITION_ESTIMATE, vis_pos);*/
+                                MAVLink.mavlink_att_pos_mocap_t att_pos = new MAVLink.mavlink_att_pos_mocap_t();
+                                att_pos.time_usec = (ulong)((cur - unix_epoch).TotalMilliseconds * 1000);
+                                att_pos.x = rbData.z; //north
+                                att_pos.y = -rbData.x; //east
+                                att_pos.z = -rbData.y; //down
+                                att_pos.q = new float[4] { rbData.qw, rbData.qz, -rbData.qx, -rbData.qy };
+                                pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.ATT_POS_MOCAP, att_pos);
                                 mavSock.SendTo(pkt, drone.ep);
                             }
                         }
@@ -375,7 +379,9 @@ namespace SampleClientML
                     }
                 }
             }
-            //Console.WriteLine("\n");
+#if DEBUG_MSG
+            Console.WriteLine("\n");
+#endif
         }
 
         static void connectToServer()
