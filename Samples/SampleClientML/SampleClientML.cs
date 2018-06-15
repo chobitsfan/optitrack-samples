@@ -56,6 +56,7 @@ namespace SampleClientML
         public float lastPosZ = 0;
         public DateTime lastTime = DateTime.MaxValue;
         public int lost_count = 0;
+        public int gps_skip_count = 0;
         public DroneData(string ip, int port)
         {
             ep = new IPEndPoint(IPAddress.Parse(ip), port);
@@ -88,10 +89,8 @@ namespace SampleClientML
 
         static void Main()
         {
-            //drones.Add("mav1", new DroneData("192.168.42.1", 14550));
-            //drones.Add("mav2", new DroneData("192.168.8.101", 14551));
-            drones.Add("mav1", new DroneData("192.168.42.1", 14550));
-            drones.Add("mav2", new DroneData("192.168.42.1", 14550));
+            drones.Add("mav1", new DroneData("192.168.1.100", 14550));
+            drones.Add("mav2", new DroneData("192.168.1.101", 14550));
 
             Console.WriteLine("SampleClientML managed client application starting...\n");
             /*  [NatNet] Initialize client object and connect to the server  */
@@ -240,45 +239,50 @@ namespace SampleClientML
                                 DateTime cur = DateTime.UtcNow;
                                 TimeSpan gps_ts = cur - gps_epoch;
                                 byte[] pkt;
-                                
-                                MAVLink.mavlink_gps_input_t gps_input = new MAVLink.mavlink_gps_input_t();
-                                gps_input.ignore_flags = 
-                                    (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_VEL_HORIZ |
-                                    (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_VEL_VERT;
-                                //gps_input.ignore_flags = 0;
-                                gps_input.fix_type = (byte)MAVLink.GPS_FIX_TYPE._3D_FIX;
-                                gps_input.gps_id = 0;
-                                gps_input.hdop = 0.1f;
-                                gps_input.vdop = 0.1f;
-                                gps_input.speed_accuracy = 0.1f;
-                                gps_input.horiz_accuracy = 0.1f;
-                                gps_input.vert_accuracy = 0.1f;
-                                gps_input.satellites_visible = 20;
-                                gps_input.time_week = (ushort)(gps_ts.TotalDays / 7);
-                                gps_input.time_week_ms = (uint)(gps_ts.TotalDays % 7 * 86400 * 1000 + GPS_LEAPSECONDS_MILLIS);
-                                gps_input.lat = (int)(((180.0 / (Math.PI * 6371008.8) * rbData.z) + 24.773481) * 10000000);
-                                gps_input.lon = (int)((121.0456978 - (180.0 / (Math.PI * 6371008.8) * rbData.x)) * 10000000);
-                                gps_input.alt = rbData.y + 125.0f;
-                                /*if (drone.lastTime == DateTime.MaxValue)
+
+                                drone.gps_skip_count++;
+                                if (drone.gps_skip_count > 5)
                                 {
-                                    gps_input.vn = 0;
-                                    gps_input.ve = 0;
-                                    gps_input.vd = 0;
-                                    drone.lastTime = cur;
+                                    drone.gps_skip_count = 0;
+                                    MAVLink.mavlink_gps_input_t gps_input = new MAVLink.mavlink_gps_input_t();
+                                    gps_input.ignore_flags =
+                                        (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_VEL_HORIZ |
+                                        (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_VEL_VERT;
+                                    //gps_input.ignore_flags = 0;
+                                    gps_input.fix_type = (byte)MAVLink.GPS_FIX_TYPE._3D_FIX;
+                                    gps_input.gps_id = 0;
+                                    gps_input.hdop = 0.1f;
+                                    gps_input.vdop = 0.1f;
+                                    //gps_input.speed_accuracy = 0.1f;
+                                    gps_input.horiz_accuracy = 0.1f;
+                                    gps_input.vert_accuracy = 0.1f;
+                                    gps_input.satellites_visible = 20;
+                                    gps_input.time_week = (ushort)(gps_ts.TotalDays / 7);
+                                    gps_input.time_week_ms = (uint)(gps_ts.TotalDays % 7 * 86400 * 1000 + GPS_LEAPSECONDS_MILLIS);
+                                    gps_input.lat = (int)(((180.0 / (Math.PI * 6371008.8) * rbData.z) + 24.773481) * 10000000);
+                                    gps_input.lon = (int)((121.0456978 - (180.0 / (Math.PI * 6371008.8) * rbData.x)) * 10000000);
+                                    gps_input.alt = rbData.y + 125.0f;
+                                    /*if (drone.lastTime == DateTime.MaxValue)
+                                    {
+                                        gps_input.vn = 0;
+                                        gps_input.ve = 0;
+                                        gps_input.vd = 0;
+                                        drone.lastTime = cur;
+                                    }
+                                    else
+                                    {
+                                        TimeSpan vts = cur - drone.lastTime;
+                                        gps_input.vn = (rbData.z - drone.lastPosZ) / vts.Milliseconds * 1000.0f;
+                                        gps_input.ve = (rbData.x - drone.lastPosX) / vts.Milliseconds * -1000.0f;
+                                        gps_input.vd = (rbData.y - drone.lastPosY) / vts.Milliseconds * -1000.0f;
+                                        drone.lastTime = cur;
+                                    }
+                                    drone.lastPosX = rbData.x;
+                                    drone.lastPosY = rbData.y;
+                                    drone.lastPosZ = rbData.z;*/
+                                    pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.GPS_INPUT, gps_input);
+                                    mavSock.SendTo(pkt, drone.ep);
                                 }
-                                else
-                                {
-                                    TimeSpan vts = cur - drone.lastTime;
-                                    gps_input.vn = (rbData.z - drone.lastPosZ) / vts.Milliseconds * 1000.0f;
-                                    gps_input.ve = (rbData.x - drone.lastPosX) / vts.Milliseconds * -1000.0f;
-                                    gps_input.vd = (rbData.y - drone.lastPosY) / vts.Milliseconds * -1000.0f;
-                                    drone.lastTime = cur;
-                                }
-                                drone.lastPosX = rbData.x;
-                                drone.lastPosY = rbData.y;
-                                drone.lastPosZ = rbData.z;*/
-                                pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.GPS_INPUT, gps_input);
-                                mavSock.SendTo(pkt, drone.ep);
 
                                 /*MAVLink.mavlink_vision_position_estimate_t vis_pos = new MAVLink.mavlink_vision_position_estimate_t();
                                 vis_pos.usec = (ulong)((cur - unix_epoch).TotalMilliseconds * 1000);
