@@ -91,6 +91,8 @@ namespace SampleClientML
         {
             drones.Add("mav1", new DroneData("192.168.1.100", 14550));
             drones.Add("mav2", new DroneData("192.168.1.101", 14550));
+            drones.Add("test", new DroneData("127.0.0.1", 14550));
+            drones.Add("bebop", new DroneData("192.168.42.1", 14550));
 
             Console.WriteLine("SampleClientML managed client application starting...\n");
             /*  [NatNet] Initialize client object and connect to the server  */
@@ -186,7 +188,7 @@ namespace SampleClientML
 
             /*  Processing and ouputting frame data every 200th frame.
                 This conditional statement is included in order to simplify the program output */
-            if(data.iFrame % 3 == 0)
+            if(data.iFrame % 8 == 0) //camera 120 fps, but ardupilot limit data rate to 70ms
             {
                 //if (data.bRecording == false)
                 //    Console.WriteLine("Frame #{0} Received:", data.iFrame);
@@ -241,7 +243,7 @@ namespace SampleClientML
                                 byte[] pkt;
 
                                 drone.gps_skip_count++;
-                                if (drone.gps_skip_count > 5)
+                                if (drone.gps_skip_count > 2)
                                 {
                                     drone.gps_skip_count = 0;
                                     MAVLink.mavlink_gps_input_t gps_input = new MAVLink.mavlink_gps_input_t();
