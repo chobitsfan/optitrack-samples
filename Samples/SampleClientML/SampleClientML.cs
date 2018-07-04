@@ -201,6 +201,7 @@ namespace SampleClientML
 
         static DateTime gps_epoch = new DateTime(1980, 1, 6);
         static DateTime unix_epoch = new DateTime(1970, 1, 1);
+        static DateTime my_start = DateTime.UtcNow;
         static uint GPS_LEAPSECONDS_MILLIS = 18000;
 
         static void processFrameData(NatNetML.FrameOfMocapData data)
@@ -239,9 +240,9 @@ namespace SampleClientML
                                 drone.lost_count = 0;
 
                                 DateTime cur = DateTime.UtcNow;
-                                TimeSpan gps_ts = cur - gps_epoch;
                                 byte[] pkt;
-
+#if false
+                                TimeSpan gps_ts = cur - gps_epoch;
                                 drone.gps_skip_count++;
                                 if (drone.gps_skip_count > 2)
                                 {
@@ -285,7 +286,7 @@ namespace SampleClientML
                                     pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.GPS_INPUT, gps_input);
                                     mavSock.SendTo(pkt, drone.ep);
                                 }
-
+#endif
                                 /*MAVLink.mavlink_vision_position_estimate_t vis_pos = new MAVLink.mavlink_vision_position_estimate_t();
                                 vis_pos.usec = (ulong)((cur - unix_epoch).TotalMilliseconds * 1000);
                                 vis_pos.x = rbData.z; //north
@@ -296,7 +297,7 @@ namespace SampleClientML
                                 vis_pos.yaw = eulers[1];
                                 pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.VISION_POSITION_ESTIMATE, vis_pos);*/
                                 MAVLink.mavlink_att_pos_mocap_t att_pos = new MAVLink.mavlink_att_pos_mocap_t();
-                                att_pos.time_usec = (ulong)((cur - unix_epoch).TotalMilliseconds * 1000);
+                                att_pos.time_usec = (ulong)((cur - my_start).TotalMilliseconds * 1000);
                                 att_pos.x = rbData.z; //north
                                 att_pos.y = -rbData.x; //east
                                 att_pos.z = -rbData.y; //down
