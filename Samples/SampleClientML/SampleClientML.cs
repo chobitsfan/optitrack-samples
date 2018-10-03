@@ -19,6 +19,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Diagnostics;
 
 using NatNetML;
 
@@ -51,12 +52,12 @@ namespace SampleClientML
     public class DroneData
     {
         public IPEndPoint ep;
-        public float lastPosX = 0;
-        public float lastPosY = 0;
-        public float lastPosZ = 0;
-        public DateTime lastTime = DateTime.MaxValue;
+        public float lastPosN = 0;
+        public float lastPosE = 0;
+        public float lastPosD = 0;
+        public long lastTime = -1;
         public int lost_count = 0;
-        public int gps_skip_count = 0;
+        //public int gps_skip_count = 0;
         public DroneData(string ip, int port)
         {
             ep = new IPEndPoint(IPAddress.Parse(ip), port);
@@ -86,13 +87,25 @@ namespace SampleClientML
         private static MAVLink.MavlinkParse mavlinkParse = new MAVLink.MavlinkParse();
         private static Socket mavSock = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         private static Dictionary<string, DroneData> drones = new Dictionary<string, DroneData>(5);
+        private static Stopwatch stopwatch;
 
         static void Main()
         {
-            drones.Add("mav1", new DroneData("192.168.1.100", 14550));
+            stopwatch = new Stopwatch();
+            stopwatch.Start();
+
+            /*drones.Add("mav1", new DroneData("192.168.1.100", 14550));
             drones.Add("mav2", new DroneData("192.168.1.101", 14550));
             drones.Add("test", new DroneData("127.0.0.1", 14550));
-            drones.Add("bebop", new DroneData("192.168.42.1", 14550));
+            drones.Add("bebop", new DroneData("192.168.42.1", 14550));*/
+            drones.Add("mambo", new DroneData("127.0.0.1", 20000));
+            //drones.Add("viper1", new DroneData("127.0.0.1", 30000));
+            //drones.Add("viper2", new DroneData("127.0.0.1", 30001));
+            drones.Add("viper1", new DroneData("192.168.1.34", 14550));
+            drones.Add("viper2", new DroneData("192.168.1.131", 14550));
+            drones.Add("viper3", new DroneData("192.168.1.57", 14550));
+            drones.Add("custom1", new DroneData("192.168.1.71", 20000));
+            //drones.Add("bebop22", new DroneData("192.168.42.1", 14550));
 
             Console.WriteLine("SampleClientML managed client application starting...\n");
             /*  [NatNet] Initialize client object and connect to the server  */
@@ -101,6 +114,15 @@ namespace SampleClientML
             Console.WriteLine("============================ SERVER DESCRIPTOR ================================\n");
             /*  [NatNet] Confirming Server Connection. Instantiate the server descriptor object and obtain the server description. */
             bool connectionConfirmed = fetchServerDescriptor();    // To confirm connection, request server description data
+
+            MAVLink.mavlink_system_time_t cmd = new MAVLink.mavlink_system_time_t();
+            cmd.time_boot_ms = 0;
+            cmd.time_unix_usec = (ulong)((DateTime.UtcNow - unix_epoch).TotalMilliseconds * 1000);
+            byte[] pkt = mavlinkParse.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.SYSTEM_TIME, cmd);
+            foreach (KeyValuePair<string, DroneData> drone in drones)
+            {
+                mavSock.SendTo(pkt, drone.Value.ep);
+            }
 
             if (connectionConfirmed)                         // Once the connection is confirmed.
             {
@@ -148,6 +170,7 @@ namespace SampleClientML
             mNatNet.OnFrameReady -= fetchFrameData;
 
             mavSock.Close();
+            stopwatch.Stop();
 
             /*  Clearing Saved Descriptions */
             mRigidBodies.Clear();
@@ -188,7 +211,8 @@ namespace SampleClientML
 
             /*  Processing and ouputting frame data every 200th frame.
                 This conditional statement is included in order to simplify the program output */
-            if(data.iFrame % 8 == 0) //camera 120 fps, but ardupilot limit data rate to 70ms
+            if(data.iFrame % 4 == 0) //camera 120 fps, but ardupilot limit data rate to 70ms
+            //for parrot bebop2, I can feed it with 14Hz. But for skyviper v2450, 5hz is max. Faster data seems overload its CPU 
             {
                 //if (data.bRecording == false)
                 //    Console.WriteLine("Frame #{0} Received:", data.iFrame);
@@ -199,8 +223,8 @@ namespace SampleClientML
             }
         }
 
-        static DateTime gps_epoch = new DateTime(1980, 1, 6);
-        static DateTime unix_epoch = new DateTime(1970, 1, 1);
+        static DateTime gps_epoch = new DateTime(1980, 1, 6, 0, 0, 0, DateTimeKind.Utc);
+        static DateTime unix_epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         static DateTime my_start = DateTime.UtcNow;
         static uint GPS_LEAPSECONDS_MILLIS = 18000;
 
@@ -239,7 +263,7 @@ namespace SampleClientML
                                 DroneData drone = drones[rb.Name];
                                 drone.lost_count = 0;
 
-                                DateTime cur = DateTime.UtcNow;
+                                //DateTime cur = DateTime.UtcNow;
                                 byte[] pkt;
 #if false
                                 TimeSpan gps_ts = cur - gps_epoch;
@@ -297,19 +321,42 @@ namespace SampleClientML
                                 vis_pos.yaw = eulers[1];
                                 pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.VISION_POSITION_ESTIMATE, vis_pos);*/
                                 MAVLink.mavlink_att_pos_mocap_t att_pos = new MAVLink.mavlink_att_pos_mocap_t();
-                                att_pos.time_usec = (ulong)((cur - my_start).TotalMilliseconds * 1000);
-                                att_pos.x = rbData.z; //north
-                                att_pos.y = -rbData.x; //east
+                                //att_pos.time_usec = (ulong)((DateTime.UtcNow - unix_epoch).TotalMilliseconds * 1000);
+                                att_pos.time_usec = (ulong)(stopwatch.ElapsedMilliseconds * 1000);
+                                att_pos.x = rbData.x; //north
+                                att_pos.y = rbData.z; //east
                                 att_pos.z = -rbData.y; //down
-                                att_pos.q = new float[4] { rbData.qw, rbData.qz, -rbData.qx, -rbData.qy };
-                                pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.ATT_POS_MOCAP, att_pos);
+                                att_pos.q = new float[4] { rbData.qw, rbData.qx, rbData.qz, -rbData.qy };
+                                pkt = mavlinkParse.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.ATT_POS_MOCAP, att_pos);
                                 mavSock.SendTo(pkt, drone.ep);
+                                //Console.WriteLine("send " + rbData.x + "," + rbData.y +" to " + drone.ep.ToString());
+                                
+                                if (drone.lastTime < 0)
+                                {
+                                }
+                                else
+                                {
+                                    MAVLink.mavlink_vision_speed_estimate_t vis_speed = new MAVLink.mavlink_vision_speed_estimate_t();
+                                    long total_ms = stopwatch.ElapsedMilliseconds - drone.lastTime;
+                                    vis_speed.x = (float)((rbData.x - drone.lastPosN) / total_ms * 1000);
+                                    vis_speed.y = (float)((rbData.z - drone.lastPosE) / total_ms * 1000);
+                                    vis_speed.z = (float)((-rbData.y - drone.lastPosD) / total_ms * 1000);
+                                    //vis_speed.usec = (ulong)((DateTime.UtcNow - unix_epoch).TotalMilliseconds * 1000);
+                                    vis_speed.usec = (ulong)(stopwatch.ElapsedMilliseconds * 1000);
+                                    pkt = mavlinkParse.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.VISION_SPEED_ESTIMATE, vis_speed);
+                                    mavSock.SendTo(pkt, drone.ep);
+                                }
+                                drone.lastTime = stopwatch.ElapsedMilliseconds;
+                                drone.lastPosN = rbData.x;
+                                drone.lastPosE = rbData.z;
+                                drone.lastPosD = -rbData.y;
+                                
                             }
                         }
                         else
                         {
                             Console.WriteLine("\t{0} is not tracked in current frame", rb.Name);
-                            if (drones.ContainsKey(rb.Name))
+                            /*if (drones.ContainsKey(rb.Name))
                             {
                                 DroneData drone = drones[rb.Name];
                                 drone.lost_count++;
@@ -322,7 +369,7 @@ namespace SampleClientML
                                     byte[] pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.GPS_INPUT, gps_input);
                                     mavSock.SendTo(pkt, drone.ep);
                                 }
-                            }
+                            }*/
                         }
                     }
                 }
