@@ -320,9 +320,10 @@ namespace SampleClientML
                                 vis_pos.roll = eulers[2];
                                 vis_pos.yaw = eulers[1];
                                 pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.VISION_POSITION_ESTIMATE, vis_pos);*/
+                                long cur_ms = stopwatch.ElapsedMilliseconds;
                                 MAVLink.mavlink_att_pos_mocap_t att_pos = new MAVLink.mavlink_att_pos_mocap_t();
                                 //att_pos.time_usec = (ulong)((DateTime.UtcNow - unix_epoch).TotalMilliseconds * 1000);
-                                att_pos.time_usec = (ulong)(stopwatch.ElapsedMilliseconds * 1000);
+                                att_pos.time_usec = (ulong)(cur_ms * 1000);
                                 att_pos.x = rbData.x; //north
                                 att_pos.y = rbData.z; //east
                                 att_pos.z = -rbData.y; //down
@@ -337,16 +338,16 @@ namespace SampleClientML
                                 else
                                 {
                                     MAVLink.mavlink_vision_speed_estimate_t vis_speed = new MAVLink.mavlink_vision_speed_estimate_t();
-                                    long total_ms = stopwatch.ElapsedMilliseconds - drone.lastTime;
-                                    vis_speed.x = (float)((rbData.x - drone.lastPosN) / total_ms * 1000);
-                                    vis_speed.y = (float)((rbData.z - drone.lastPosE) / total_ms * 1000);
-                                    vis_speed.z = (float)((-rbData.y - drone.lastPosD) / total_ms * 1000);
+                                    float total_s = (cur_ms - drone.lastTime) * 0.001f;
+                                    vis_speed.x = (rbData.x - drone.lastPosN) / total_s;
+                                    vis_speed.y = (rbData.z - drone.lastPosE) / total_s;
+                                    vis_speed.z = (-rbData.y - drone.lastPosD) / total_s;
                                     //vis_speed.usec = (ulong)((DateTime.UtcNow - unix_epoch).TotalMilliseconds * 1000);
-                                    vis_speed.usec = (ulong)(stopwatch.ElapsedMilliseconds * 1000);
+                                    vis_speed.usec = (ulong)(cur_ms * 1000);
                                     pkt = mavlinkParse.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.VISION_SPEED_ESTIMATE, vis_speed);
                                     mavSock.SendTo(pkt, drone.ep);
                                 }
-                                drone.lastTime = stopwatch.ElapsedMilliseconds;
+                                drone.lastTime = cur_ms;
                                 drone.lastPosN = rbData.x;
                                 drone.lastPosE = rbData.z;
                                 drone.lastPosD = -rbData.y;
