@@ -106,6 +106,8 @@ namespace SampleClientML
             drones.Add("viper3", new DroneData("192.168.1.57", 14550));
             drones.Add("custom1", new DroneData("192.168.1.71", 20000));
             //drones.Add("bebop22", new DroneData("192.168.42.1", 14550));
+            drones.Add("micro1", new DroneData("127.0.0.1", 20000));
+            drones.Add("viper4", new DroneData("127.0.0.1", 20000));
 
             Console.WriteLine("SampleClientML managed client application starting...\n");
             /*  [NatNet] Initialize client object and connect to the server  */
