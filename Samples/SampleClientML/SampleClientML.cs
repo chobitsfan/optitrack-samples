@@ -97,6 +97,7 @@ namespace SampleClientML
 
             drones.Add("micro_uwb", new DroneData("127.0.0.1", 20000, 0));
             drones.Add("micro_uwb2", new DroneData("127.0.0.1", 20000, 1));
+            drones.Add("micro_uwb3", new DroneData("127.0.0.1", 20000, 2));
 
             Console.WriteLine("SampleClientML managed client application starting...\n");
             /*  [NatNet] Initialize client object and connect to the server  */
@@ -202,7 +203,7 @@ namespace SampleClientML
 
             /*  Processing and ouputting frame data every 200th frame.
                 This conditional statement is included in order to simplify the program output */
-            if(data.iFrame % 10 == 0) //camera 120 fps, but ardupilot limit data rate to 70ms
+            if(data.iFrame % 12 == 0) //camera 120 fps, but ardupilot limit data rate to 70ms
             //for parrot bebop2, I can feed it with 14Hz. But for skyviper v2450, 5hz is max. Faster data seems overload its CPU 
             {
                 //if (data.bRecording == false)
