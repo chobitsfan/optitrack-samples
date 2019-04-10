@@ -58,6 +58,7 @@ namespace SampleClientML
         public long lastTime = -1;
         public int lost_count = 0;
         public byte uwb_tag_id = 0;
+        public int send_count = 10;
         public DroneData(string ip, int port, byte uwb_tag_id)
         {
             ep = new IPEndPoint(IPAddress.Parse(ip), port);
@@ -218,7 +219,7 @@ namespace SampleClientML
         static DateTime gps_epoch = new DateTime(1980, 1, 6, 0, 0, 0, DateTimeKind.Utc);
         static DateTime unix_epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         static DateTime my_start = DateTime.UtcNow;
-        static uint GPS_LEAPSECONDS_MILLIS = 18000;
+        //static uint GPS_LEAPSECONDS_MILLIS = 18000;
 
         static void processFrameData(NatNetML.FrameOfMocapData data)
         {
@@ -255,72 +256,15 @@ namespace SampleClientML
                                 DroneData drone = drones[rb.Name];
                                 drone.lost_count = 0;
 
-                                //DateTime cur = DateTime.UtcNow;
-                                byte[] pkt;
-#if false
-                                TimeSpan gps_ts = cur - gps_epoch;
-                                drone.gps_skip_count++;
-                                if (drone.gps_skip_count > 2)
-                                {
-                                    drone.gps_skip_count = 0;
-                                    MAVLink.mavlink_gps_input_t gps_input = new MAVLink.mavlink_gps_input_t();
-                                    gps_input.ignore_flags =
-                                        (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_VEL_HORIZ |
-                                        (ushort)MAVLink.GPS_INPUT_IGNORE_FLAGS.GPS_INPUT_IGNORE_FLAG_VEL_VERT;
-                                    //gps_input.ignore_flags = 0;
-                                    gps_input.fix_type = (byte)MAVLink.GPS_FIX_TYPE._3D_FIX;
-                                    gps_input.gps_id = 0;
-                                    gps_input.hdop = 0.1f;
-                                    gps_input.vdop = 0.1f;
-                                    //gps_input.speed_accuracy = 0.1f;
-                                    gps_input.horiz_accuracy = 0.1f;
-                                    gps_input.vert_accuracy = 0.1f;
-                                    gps_input.satellites_visible = 20;
-                                    gps_input.time_week = (ushort)(gps_ts.TotalDays / 7);
-                                    gps_input.time_week_ms = (uint)(gps_ts.TotalDays % 7 * 86400 * 1000 + GPS_LEAPSECONDS_MILLIS);
-                                    gps_input.lat = (int)(((180.0 / (Math.PI * 6371008.8) * rbData.z) + 24.773481) * 10000000);
-                                    gps_input.lon = (int)((121.0456978 - (180.0 / (Math.PI * 6371008.8) * rbData.x)) * 10000000);
-                                    gps_input.alt = rbData.y + 125.0f;
-                                    /*if (drone.lastTime == DateTime.MaxValue)
-                                    {
-                                        gps_input.vn = 0;
-                                        gps_input.ve = 0;
-                                        gps_input.vd = 0;
-                                        drone.lastTime = cur;
-                                    }
-                                    else
-                                    {
-                                        TimeSpan vts = cur - drone.lastTime;
-                                        gps_input.vn = (rbData.z - drone.lastPosZ) / vts.Milliseconds * 1000.0f;
-                                        gps_input.ve = (rbData.x - drone.lastPosX) / vts.Milliseconds * -1000.0f;
-                                        gps_input.vd = (rbData.y - drone.lastPosY) / vts.Milliseconds * -1000.0f;
-                                        drone.lastTime = cur;
-                                    }
-                                    drone.lastPosX = rbData.x;
-                                    drone.lastPosY = rbData.y;
-                                    drone.lastPosZ = rbData.z;*/
-                                    pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.GPS_INPUT, gps_input);
-                                    mavSock.SendTo(pkt, drone.ep);
-                                }
-#endif
-                                /*MAVLink.mavlink_vision_position_estimate_t vis_pos = new MAVLink.mavlink_vision_position_estimate_t();
-                                vis_pos.usec = (ulong)((cur - unix_epoch).TotalMilliseconds * 1000);
-                                vis_pos.x = rbData.z; //north
-                                vis_pos.y = -rbData.x; //east
-                                vis_pos.z = -rbData.y; //down
-                                vis_pos.pitch = eulers[0];
-                                vis_pos.roll = eulers[2];
-                                vis_pos.yaw = eulers[1];
-                                pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.VISION_POSITION_ESTIMATE, vis_pos);*/
                                 long cur_ms = stopwatch.ElapsedMilliseconds;
                                 MAVLink.mavlink_att_pos_mocap_t att_pos = new MAVLink.mavlink_att_pos_mocap_t();
-                                //att_pos.time_usec = (ulong)((DateTime.UtcNow - unix_epoch).TotalMilliseconds * 1000);
                                 att_pos.time_usec = (ulong)(cur_ms * 1000);
                                 att_pos.x = rbData.x; //north
                                 att_pos.y = rbData.z; //east
                                 att_pos.z = -rbData.y; //down
                                 att_pos.q = new float[4] { rbData.qw, rbData.qx, rbData.qz, -rbData.qy };
-                                pkt = mavlinkParse.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.ATT_POS_MOCAP, att_pos);
+                                byte[] pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.ATT_POS_MOCAP, att_pos);
+#if false
                                 byte[] uwb_data = new byte[10 + pkt.Length + 1];
                                 uwb_data[0] = 0x54;
                                 uwb_data[1] = 0xf1;
@@ -339,6 +283,7 @@ namespace SampleClientML
                                 }
                                 uwb_data[uwb_data.Length - 1] = chk_sum;
                                 mavSock.SendTo(uwb_data, drone.ep);
+#endif
                                 //Console.WriteLine("send " + rbData.x + "," + rbData.y +" to " + drone.ep.ToString());
                                 
                                 if (drone.lastTime < 0)
@@ -351,9 +296,30 @@ namespace SampleClientML
                                     vis_speed.x = (rbData.x - drone.lastPosN) / total_s;
                                     vis_speed.y = (rbData.z - drone.lastPosE) / total_s;
                                     vis_speed.z = (-rbData.y - drone.lastPosD) / total_s;
-                                    //vis_speed.usec = (ulong)((DateTime.UtcNow - unix_epoch).TotalMilliseconds * 1000);
                                     vis_speed.usec = (ulong)(cur_ms * 1000);
-                                    pkt = mavlinkParse.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.VISION_SPEED_ESTIMATE, vis_speed);
+                                    byte[] pkt2 = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.VISION_SPEED_ESTIMATE, vis_speed);
+                                    int total_len = pkt.Length + pkt2.Length;
+                                    byte[] uwb_data = new byte[10 + total_len + 1];
+                                    uwb_data[0] = 0x54;
+                                    uwb_data[1] = 0xf1;
+                                    uwb_data[2] = 0xff;
+                                    uwb_data[3] = 0xff;
+                                    uwb_data[4] = 0xff;
+                                    uwb_data[5] = 0xff;
+                                    uwb_data[6] = 2;
+                                    uwb_data[7] = drone.uwb_tag_id;
+                                    uwb_data[8] = (byte)(total_len & 0xff);
+                                    uwb_data[9] = (byte)(total_len >> 16);
+                                    Array.Copy(pkt, 0, uwb_data, 10, pkt.Length);
+                                    Array.Copy(pkt2, 0, uwb_data, 10 + pkt.Length, pkt2.Length);
+                                    byte chk_sum = 0;
+                                    foreach (byte uwb_data_byte in uwb_data)
+                                    {
+                                        chk_sum += uwb_data_byte;
+                                    }
+                                    uwb_data[uwb_data.Length - 1] = chk_sum;
+                                    mavSock.SendTo(uwb_data, drone.ep);
+#if false
                                     uwb_data = new byte[10 + pkt.Length + 1];
                                     uwb_data[0] = 0x54;
                                     uwb_data[1] = 0xf1;
@@ -372,6 +338,7 @@ namespace SampleClientML
                                     }
                                     uwb_data[uwb_data.Length - 1] = chk_sum;
                                     mavSock.SendTo(uwb_data, drone.ep);
+#endif
                                 }
                                 drone.lastTime = cur_ms;
                                 drone.lastPosN = rbData.x;
