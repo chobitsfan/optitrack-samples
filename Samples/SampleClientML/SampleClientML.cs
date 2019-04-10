@@ -58,7 +58,7 @@ namespace SampleClientML
         public long lastTime = -1;
         public int lost_count = 0;
         public byte uwb_tag_id = 0;
-        public int send_count = 10;
+        public int send_count = 0;
         public DroneData(string ip, int port, byte uwb_tag_id)
         {
             ep = new IPEndPoint(IPAddress.Parse(ip), port);
@@ -204,7 +204,7 @@ namespace SampleClientML
 
             /*  Processing and ouputting frame data every 200th frame.
                 This conditional statement is included in order to simplify the program output */
-            if(data.iFrame % 12 == 0) //camera 120 fps, but ardupilot limit data rate to 70ms
+            //if(data.iFrame % 12 == 0) //camera 120 fps, but ardupilot limit data rate to 70ms
             //for parrot bebop2, I can feed it with 14Hz. But for skyviper v2450, 5hz is max. Faster data seems overload its CPU 
             {
                 //if (data.bRecording == false)
@@ -223,6 +223,7 @@ namespace SampleClientML
 
         static void processFrameData(NatNetML.FrameOfMocapData data)
         {
+            bool data_gogo = true;
             /*  Parsing Rigid Body Frame Data   */
             for (int i = 0; i < mRigidBodies.Count; i++)
             {
@@ -255,96 +256,59 @@ namespace SampleClientML
                             {
                                 DroneData drone = drones[rb.Name];
                                 drone.lost_count = 0;
-
                                 long cur_ms = stopwatch.ElapsedMilliseconds;
-                                MAVLink.mavlink_att_pos_mocap_t att_pos = new MAVLink.mavlink_att_pos_mocap_t();
-                                att_pos.time_usec = (ulong)(cur_ms * 1000);
-                                att_pos.x = rbData.x; //north
-                                att_pos.y = rbData.z; //east
-                                att_pos.z = -rbData.y; //down
-                                att_pos.q = new float[4] { rbData.qw, rbData.qx, rbData.qz, -rbData.qy };
-                                byte[] pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.ATT_POS_MOCAP, att_pos);
-#if false
-                                byte[] uwb_data = new byte[10 + pkt.Length + 1];
-                                uwb_data[0] = 0x54;
-                                uwb_data[1] = 0xf1;
-                                uwb_data[2] = 0xff;
-                                uwb_data[3] = 0xff;
-                                uwb_data[4] = 0xff;
-                                uwb_data[5] = 0xff;
-                                uwb_data[6] = 2;
-                                uwb_data[7] = drone.uwb_tag_id;
-                                uwb_data[8] = (byte)pkt.Length;
-                                Array.Copy(pkt, 0, uwb_data, 10, pkt.Length);
-                                byte chk_sum = 0;
-                                foreach (byte uwb_data_byte in uwb_data)
+                                if (drone.send_count > 0)
                                 {
-                                    chk_sum += uwb_data_byte;
+                                    drone.send_count--;
                                 }
-                                uwb_data[uwb_data.Length - 1] = chk_sum;
-                                mavSock.SendTo(uwb_data, drone.ep);
-#endif
-                                //Console.WriteLine("send " + rbData.x + "," + rbData.y +" to " + drone.ep.ToString());
-                                
-                                if (drone.lastTime < 0)
+                                else if (data_gogo)
                                 {
-                                }
-                                else
-                                {
-                                    MAVLink.mavlink_vision_speed_estimate_t vis_speed = new MAVLink.mavlink_vision_speed_estimate_t();
-                                    float total_s = (cur_ms - drone.lastTime) * 0.001f;
-                                    vis_speed.x = (rbData.x - drone.lastPosN) / total_s;
-                                    vis_speed.y = (rbData.z - drone.lastPosE) / total_s;
-                                    vis_speed.z = (-rbData.y - drone.lastPosD) / total_s;
-                                    vis_speed.usec = (ulong)(cur_ms * 1000);
-                                    byte[] pkt2 = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.VISION_SPEED_ESTIMATE, vis_speed);
-                                    int total_len = pkt.Length + pkt2.Length;
-                                    byte[] uwb_data = new byte[10 + total_len + 1];
-                                    uwb_data[0] = 0x54;
-                                    uwb_data[1] = 0xf1;
-                                    uwb_data[2] = 0xff;
-                                    uwb_data[3] = 0xff;
-                                    uwb_data[4] = 0xff;
-                                    uwb_data[5] = 0xff;
-                                    uwb_data[6] = 2;
-                                    uwb_data[7] = drone.uwb_tag_id;
-                                    uwb_data[8] = (byte)(total_len & 0xff);
-                                    uwb_data[9] = (byte)(total_len >> 16);
-                                    Array.Copy(pkt, 0, uwb_data, 10, pkt.Length);
-                                    Array.Copy(pkt2, 0, uwb_data, 10 + pkt.Length, pkt2.Length);
-                                    byte chk_sum = 0;
-                                    foreach (byte uwb_data_byte in uwb_data)
+                                    drone.send_count = 10;
+                                    data_gogo = false;
+                                    MAVLink.mavlink_att_pos_mocap_t att_pos = new MAVLink.mavlink_att_pos_mocap_t();
+                                    att_pos.time_usec = (ulong)(cur_ms * 1000);
+                                    att_pos.x = rbData.x; //north
+                                    att_pos.y = rbData.z; //east
+                                    att_pos.z = -rbData.y; //down
+                                    att_pos.q = new float[4] { rbData.qw, rbData.qx, rbData.qz, -rbData.qy };
+                                    byte[] pkt = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.ATT_POS_MOCAP, att_pos);
+
+                                    if (drone.lastTime >= 0)
                                     {
-                                        chk_sum += uwb_data_byte;
+                                        MAVLink.mavlink_vision_speed_estimate_t vis_speed = new MAVLink.mavlink_vision_speed_estimate_t();
+                                        float total_s = (cur_ms - drone.lastTime) * 0.001f;
+                                        vis_speed.x = (rbData.x - drone.lastPosN) / total_s;
+                                        vis_speed.y = (rbData.z - drone.lastPosE) / total_s;
+                                        vis_speed.z = (-rbData.y - drone.lastPosD) / total_s;
+                                        vis_speed.usec = (ulong)(cur_ms * 1000);
+                                        byte[] pkt2 = mavlinkParse.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.VISION_SPEED_ESTIMATE, vis_speed);
+                                        int total_len = pkt.Length + pkt2.Length;
+                                        byte[] uwb_data = new byte[10 + total_len + 1];
+                                        uwb_data[0] = 0x54;
+                                        uwb_data[1] = 0xf1;
+                                        uwb_data[2] = 0xff;
+                                        uwb_data[3] = 0xff;
+                                        uwb_data[4] = 0xff;
+                                        uwb_data[5] = 0xff;
+                                        uwb_data[6] = 2;
+                                        uwb_data[7] = drone.uwb_tag_id;
+                                        uwb_data[8] = (byte)(total_len & 0xff);
+                                        uwb_data[9] = (byte)(total_len >> 16);
+                                        Array.Copy(pkt, 0, uwb_data, 10, pkt.Length);
+                                        Array.Copy(pkt2, 0, uwb_data, 10 + pkt.Length, pkt2.Length);
+                                        byte chk_sum = 0;
+                                        foreach (byte uwb_data_byte in uwb_data)
+                                        {
+                                            chk_sum += uwb_data_byte;
+                                        }
+                                        uwb_data[uwb_data.Length - 1] = chk_sum;
+                                        mavSock.SendTo(uwb_data, drone.ep);
                                     }
-                                    uwb_data[uwb_data.Length - 1] = chk_sum;
-                                    mavSock.SendTo(uwb_data, drone.ep);
-#if false
-                                    uwb_data = new byte[10 + pkt.Length + 1];
-                                    uwb_data[0] = 0x54;
-                                    uwb_data[1] = 0xf1;
-                                    uwb_data[2] = 0xff;
-                                    uwb_data[3] = 0xff;
-                                    uwb_data[4] = 0xff;
-                                    uwb_data[5] = 0xff;
-                                    uwb_data[6] = 2;
-                                    uwb_data[7] = drone.uwb_tag_id;
-                                    uwb_data[8] = (byte)pkt.Length;
-                                    Array.Copy(pkt, 0, uwb_data, 10, pkt.Length);
-                                    chk_sum = 0;
-                                    foreach (byte uwb_data_byte in uwb_data)
-                                    {
-                                        chk_sum += uwb_data_byte;
-                                    }
-                                    uwb_data[uwb_data.Length - 1] = chk_sum;
-                                    mavSock.SendTo(uwb_data, drone.ep);
-#endif
                                 }
                                 drone.lastTime = cur_ms;
                                 drone.lastPosN = rbData.x;
                                 drone.lastPosE = rbData.z;
                                 drone.lastPosD = -rbData.y;
-                                
                             }
                         }
                         else
